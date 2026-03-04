@@ -1,0 +1,13 @@
+post_install() {
+    echo "==> Laurel server installed."
+    echo "    1. Edit /etc/nginx/sites-available/laurel.conf — set your domain"
+    echo "    2. Ensure nginx.conf includes: include /etc/nginx/sites-enabled/*;"
+    echo "    3. Symlink: sudo ln -sf /etc/nginx/sites-available/laurel.conf /etc/nginx/sites-enabled/"
+    echo "    4. Test: sudo nginx -t && sudo systemctl reload nginx"
+    echo "    5. HTTPS: sudo certbot --nginx -d clips.yourdomain.com"
+    echo "    6. Homepage: cp /usr/share/laurel-server/index.html /srv/clips/"
+}
+
+post_upgrade() {
+    post_install
+}

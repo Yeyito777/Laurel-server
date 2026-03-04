@@ -1,0 +1,37 @@
+#!/bin/sh
+# Laurel server auto-deploy hook
+# Install: cp post-receive ~/laurel-server.git/hooks/ && chmod +x ~/laurel-server.git/hooks/post-receive
+
+DEPLOY_DIR=/opt/laurel-server
+CLIP_DIR=/srv/clips
+NGINX_CONF_NAME=laurel.conf
+
+echo "==> Deploying Laurel server..."
+
+mkdir -p "$DEPLOY_DIR"
+GIT_WORK_TREE="$DEPLOY_DIR" git checkout -f main 2>/dev/null || \
+GIT_WORK_TREE="$DEPLOY_DIR" git checkout -f master
+
+# Deploy homepage
+if [ -f "$DEPLOY_DIR/index.html" ]; then
+    cp "$DEPLOY_DIR/index.html" "$CLIP_DIR/index.html"
+    chmod 644 "$CLIP_DIR/index.html"
+    echo "    Deployed homepage"
+fi
+
+# Deploy nginx config if changed
+NGINX_SRC="$DEPLOY_DIR/laurel.nginx.conf"
+NGINX_DST="/etc/nginx/sites-available/$NGINX_CONF_NAME"
+if [ -f "$NGINX_SRC" ] && ! diff -q "$NGINX_SRC" "$NGINX_DST" >/dev/null 2>&1; then
+    sudo cp "$NGINX_SRC" "$NGINX_DST"
+    if sudo nginx -t 2>&1; then
+        sudo systemctl reload nginx
+        echo "    Nginx config updated and reloaded"
+    else
+        echo "    ERROR: nginx config test failed, not reloading"
+    fi
+else
+    echo "    Nginx config unchanged"
+fi
+
+echo "==> Deploy complete"
