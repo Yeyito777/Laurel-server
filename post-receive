@@ -4,7 +4,7 @@
 
 DEPLOY_DIR=/opt/laurel-server
 CLIP_DIR=/srv/clips
-NGINX_CONF_NAME=laurel.conf
+NGINX_CONF_NAME="${LAUREL_NGINX_CONF_NAME:-laurel.conf}"
 
 echo "==> Deploying Laurel server..."
 
