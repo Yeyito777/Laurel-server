@@ -60,3 +60,4 @@ Every push templates the nginx config and systemd service from `/etc/laurel-serv
 ├── .owner              # Ident token (hidden from web)
 └── .name               # Display name (hidden from web, optional)
 ```
+# trigger
