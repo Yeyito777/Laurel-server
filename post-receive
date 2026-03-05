@@ -34,4 +34,16 @@ else
     echo "    Nginx config unchanged"
 fi
 
+# Deploy API service
+if [ -f "$DEPLOY_DIR/laurel-api" ]; then
+    chmod +x "$DEPLOY_DIR/laurel-api"
+    if [ -f "$DEPLOY_DIR/laurel-api.service" ]; then
+        sudo cp "$DEPLOY_DIR/laurel-api.service" /etc/systemd/system/
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now laurel-api
+        sudo systemctl restart laurel-api
+        echo "    API service deployed and restarted"
+    fi
+fi
+
 echo "==> Deploy complete"

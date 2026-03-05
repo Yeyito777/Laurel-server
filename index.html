@@ -3,13 +3,161 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>clips</title>
+<title>clips — laurel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0f;color:#606080;font-family:monospace;display:flex;align-items:center;justify-content:center;min-height:100vh}
+body{background:#0a0a0f;color:#c0c0c0;font-family:monospace;min-height:100vh;padding:2rem}
+a{color:#7070a0;text-decoration:none}
+a:hover{text-decoration:underline}
+h1{color:#606080;font-size:1rem;margin-bottom:1.5rem}
+.pair{max-width:480px;margin:4rem auto;text-align:center;color:#606080}
+.pair input{background:#12121a;border:1px solid #1a1a2e;color:#c0c0c0;font-family:monospace;padding:.5rem;width:100%;margin:.75rem 0;border-radius:3px;text-align:center}
+.pair button,.clip-actions button{background:#1a1a2e;border:1px solid #2a2a3e;color:#7070a0;font-family:monospace;padding:.4rem .8rem;cursor:pointer;border-radius:3px}
+.pair button:hover,.clip-actions button:hover{border-color:#7070a0}
+.clips{max-width:900px;margin:0 auto}
+.clip{display:flex;align-items:center;gap:1rem;padding:.75rem;border-bottom:1px solid #12121a}
+.clip:hover{background:#0e0e18}
+.clip-thumb{width:120px;height:68px;object-fit:cover;border-radius:3px;border:1px solid #1a1a2e;flex-shrink:0}
+.clip-thumb-none{width:120px;height:68px;background:#12121a;border-radius:3px;border:1px solid #1a1a2e;flex-shrink:0}
+.clip-info{flex:1;min-width:0}
+.clip-name{color:#c0c0c0;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clip-slug{color:#404060;font-size:.75rem;margin-top:.2rem}
+.clip-size{color:#404060;font-size:.75rem}
+.clip-actions{display:flex;gap:.5rem;flex-shrink:0}
+.clip-actions button.del{color:#a05050;border-color:#3e1a1a}
+.clip-actions button.del:hover{border-color:#a05050}
+.rename-input{background:#12121a;border:1px solid #2a2a3e;color:#c0c0c0;font-family:monospace;padding:.3rem .5rem;border-radius:3px;width:200px}
+.empty{text-align:center;color:#404060;margin-top:4rem}
+.msg{text-align:center;color:#606080;margin-top:1rem;font-size:.85rem}
 </style>
 </head>
 <body>
-<p>clips.yeyito.dev</p>
+<div class="clips" id="app"></div>
+<script>
+const API = '/api/clips';
+
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+}
+
+function setCookie(name, val) {
+    document.cookie = name + '=' + encodeURIComponent(val) + ';path=/;max-age=315360000;SameSite=Lax;Secure';
+}
+
+function fmtSize(b) {
+    if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+    if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+    if (b > 1e3) return (b/1e3).toFixed(1) + ' KB';
+    return b + ' B';
+}
+
+function showPair() {
+    const params = new URLSearchParams(location.search);
+    const pairToken = params.get('pair');
+    if (pairToken && /^[0-9a-f]{32}$/.test(pairToken)) {
+        setCookie('ident', pairToken);
+        history.replaceState(null, '', '/');
+        loadClips();
+        return;
+    }
+    const app = document.getElementById('app');
+    app.innerHTML = `
+        <div class="pair">
+            <p>paste your ident token to view your clips</p>
+            <p style="margin-top:.5rem;font-size:.8rem;color:#404060">
+                find it at <code>~/.config/laurel/ident</code>
+            </p>
+            <input id="ident-input" placeholder="ident token" maxlength="32" spellcheck="false">
+            <br><button onclick="doPair()">pair</button>
+        </div>`;
+}
+
+function doPair() {
+    const v = document.getElementById('ident-input').value.trim();
+    if (!/^[0-9a-f]{32}$/.test(v)) return;
+    setCookie('ident', v);
+    loadClips();
+}
+
+async function loadClips() {
+    const app = document.getElementById('app');
+    const res = await fetch(API, {credentials: 'same-origin'});
+    if (res.status === 401) { showPair(); return; }
+    const data = await res.json();
+    if (!data.clips || data.clips.length === 0) {
+        app.innerHTML = '<h1>your clips</h1><p class="empty">no clips yet — press your hotkey to save one</p>';
+        return;
+    }
+    let html = '<h1>your clips</h1>';
+    for (const c of data.clips) {
+        const name = c.name || c.slug;
+        const thumbEl = c.thumb
+            ? `<img class="clip-thumb" src="/${c.slug}/thumb.jpg" alt="">`
+            : `<div class="clip-thumb-none"></div>`;
+        html += `
+        <div class="clip" id="clip-${c.slug}">
+            <a href="/${c.slug}/">${thumbEl}</a>
+            <div class="clip-info">
+                <div class="clip-name" id="name-${c.slug}">${esc(name)}</div>
+                <div class="clip-slug"><a href="/${c.slug}/">${c.slug}</a></div>
+                <div class="clip-size">${fmtSize(c.size)}</div>
+            </div>
+            <div class="clip-actions">
+                <button onclick="renameClip('${c.slug}')">rename</button>
+                <button class="del" onclick="deleteClip('${c.slug}')">delete</button>
+            </div>
+        </div>`;
+    }
+    app.innerHTML = html;
+}
+
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+async function renameClip(slug) {
+    const el = document.getElementById('name-' + slug);
+    const cur = el.textContent;
+    el.innerHTML = `<input class="rename-input" id="ri-${slug}" value="${esc(cur)}" onkeydown="if(event.key==='Enter')doRename('${slug}')">`;
+    document.getElementById('ri-' + slug).focus();
+}
+
+async function doRename(slug) {
+    const input = document.getElementById('ri-' + slug);
+    const name = input.value.trim();
+    if (!name) return;
+    const res = await fetch(API + '/' + slug, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+    });
+    if (res.ok) {
+        document.getElementById('name-' + slug).textContent = name;
+    }
+}
+
+async function deleteClip(slug) {
+    if (!confirm('Delete clip ' + slug + '?')) return;
+    const res = await fetch(API + '/' + slug, {
+        method: 'DELETE',
+        credentials: 'same-origin'
+    });
+    if (res.ok) {
+        const el = document.getElementById('clip-' + slug);
+        if (el) el.remove();
+    }
+}
+
+// Boot
+if (getCookie('ident')) {
+    loadClips();
+} else {
+    showPair();
+}
+</script>
 </body>
 </html>
