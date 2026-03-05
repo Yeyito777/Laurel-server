@@ -1,0 +1,53 @@
+name: Publish to AUR
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm git openssh
+          useradd -m builder
+
+      - name: Set up AUR SSH key
+        run: |
+          mkdir -p /root/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > /root/.ssh/aur_ed25519
+          chmod 600 /root/.ssh/aur_ed25519
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Yeyito"
+          git config --global user.email "yeyito@yeyito.dev"
+          git config --global safe.directory '*'
+
+      - name: Clone AUR repo
+        env:
+          GIT_SSH_COMMAND: "ssh -i /root/.ssh/aur_ed25519 -o StrictHostKeyChecking=no"
+        run: git clone ssh://aur@aur.archlinux.org/laurel-server-git.git /tmp/aur
+
+      - name: Update AUR package
+        env:
+          GIT_SSH_COMMAND: "ssh -i /root/.ssh/aur_ed25519 -o StrictHostKeyChecking=no"
+        run: |
+          cp PKGBUILD laurel-server.install /tmp/aur/
+          cd /tmp/aur
+          chown -R builder: .
+          su builder -c "makepkg --printsrcinfo" > .SRCINFO
+          git add PKGBUILD .SRCINFO laurel-server.install
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+          else
+            git commit -m "Update to $(grep pkgver .SRCINFO | head -1 | awk '{print $3}')"
+            git push
+            echo "Published to AUR"
+          fi
