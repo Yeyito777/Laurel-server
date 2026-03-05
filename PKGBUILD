@@ -2,7 +2,7 @@
 pkgname=laurel-server-git
 pkgver=r0
 pkgrel=1
-pkgdesc='Laurel clip server — serves video clips with a management UI and API'
+pkgdesc='Laurel server — serves video clips with a management UI and API'
 arch=('any')
 url='https://github.com/Yeyito777/Laurel-server'
 license=('MIT')
