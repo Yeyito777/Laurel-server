@@ -1,3 +1,4 @@
+# AUR: https://aur.archlinux.org/packages/laurel-server-git
 # Maintainer: Yeyito <yeyito@yeyito.dev>
 pkgname=laurel-server-git
 pkgver=r0
