@@ -1,0 +1,15 @@
+# Laurel server configuration
+# Copy this to /etc/laurel-server.conf and edit for your setup.
+
+# Your clip domain (required)
+DOMAIN=clips.example.com
+
+# System user that owns /srv/clips and runs the API (required)
+USER=laurel
+
+# Directory where clips are stored
+CLIP_DIR=/srv/clips
+
+# API bind address and port
+API_BIND=127.0.0.1
+API_PORT=9100

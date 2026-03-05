@@ -5,10 +5,10 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/opt/laurel-server/laurel-api
-Environment=CLIP_DIR=/srv/clips
-Environment=BIND=127.0.0.1
-Environment=PORT=9100
-User=yeyito
+Environment=CLIP_DIR={{CLIP_DIR}}
+Environment=BIND={{API_BIND}}
+Environment=PORT={{API_PORT}}
+User={{USER}}
 Restart=on-failure
 RestartSec=3
 
