@@ -12,7 +12,6 @@ Reads .owner files from /srv/clips/<slug>/ to determine ownership.
 No database — the filesystem is the source of truth.
 """
 
-import cgi
 import http.server
 import json
 import os
@@ -21,7 +20,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from email.parser import BytesParser
 from http.cookies import SimpleCookie
+from io import BytesIO
 from urllib.parse import urlparse, parse_qs
 
 CLIP_DIR = os.environ.get("CLIP_DIR", "/srv/clips")
@@ -129,6 +130,38 @@ def list_clips(ident):
     return clips
 
 
+def _parse_multipart(body, boundary):
+    """Parse multipart form data. Returns dict of {name: (data, filename)}."""
+    parts = {}
+    delimiter = b"--" + boundary
+    chunks = body.split(delimiter)
+    for chunk in chunks:
+        # Skip preamble and closing
+        if not chunk or chunk.strip() == b"--" or chunk.strip() == b"":
+            continue
+        # Split headers from body (separated by \r\n\r\n)
+        if b"\r\n\r\n" not in chunk:
+            continue
+        header_block, data = chunk.split(b"\r\n\r\n", 1)
+        # Remove trailing \r\n from data
+        if data.endswith(b"\r\n"):
+            data = data[:-2]
+        # Parse Content-Disposition
+        name = None
+        filename = None
+        for line in header_block.decode("utf-8", errors="replace").split("\r\n"):
+            if "Content-Disposition:" in line:
+                for param in line.split(";"):
+                    param = param.strip()
+                    if param.startswith("name="):
+                        name = param[5:].strip('"')
+                    elif param.startswith("filename="):
+                        filename = param[9:].strip('"')
+        if name:
+            parts[name] = (data, filename)
+    return parts
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # Quiet logging — systemd journal captures stderr
@@ -211,31 +244,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_json(400, {"error": "expected multipart/form-data"})
             return
 
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": content_type,
-            },
-        )
+        # Extract boundary
+        boundary = None
+        for part in content_type.split(";"):
+            part = part.strip()
+            if part.startswith("boundary="):
+                boundary = part[9:].strip('"')
+        if not boundary:
+            self.send_json(400, {"error": "no boundary in content-type"})
+            return
 
-        # Get required fields
-        if "file" not in form:
+        # Read the full body
+        body = self.rfile.read(content_length)
+
+        # Parse multipart manually
+        parts = _parse_multipart(body, boundary.encode())
+
+        if "file" not in parts:
             self.send_json(400, {"error": "missing 'file' field"})
             return
 
-        file_field = form["file"]
-        if not file_field.filename:
+        file_data, file_filename = parts["file"]
+        if not file_filename:
             self.send_json(400, {"error": "no filename"})
             return
 
-        slug = form.getvalue("slug", "")
+        slug_data = parts.get("slug", (b"", None))
+        slug = slug_data[0].decode().strip() if slug_data[0] else ""
         if not slug or not SLUG_RE.match(slug):
             self.send_json(400, {"error": "invalid slug"})
             return
 
-        html_content = form.getvalue("html", "")
+        html_data = parts.get("html", (b"", None))
+        html_content = html_data[0].decode() if html_data[0] else ""
 
         # Create clip directory
         clip_dir = os.path.join(CLIP_DIR, slug)
@@ -246,10 +287,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         os.makedirs(clip_dir, mode=0o755)
 
         # Save video file
-        filename = os.path.basename(file_field.filename)
+        filename = os.path.basename(file_filename)
         video_path = os.path.join(clip_dir, filename)
         with open(video_path, "wb") as f:
-            shutil.copyfileobj(file_field.file, f)
+            f.write(file_data)
         os.chmod(video_path, 0o644)
 
         # Save HTML page
