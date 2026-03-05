@@ -71,13 +71,29 @@ else
 fi
 rm -f "$NGINX_TMP"
 
-# Deploy API service (templated)
+# Deploy API service
 if [ -f "$DEPLOY_DIR/laurel-api" ]; then
     chmod +x "$DEPLOY_DIR/laurel-api"
-    SERVICE_TMP="$(mktemp)"
-    template "$DEPLOY_DIR/laurel-api.service" > "$SERVICE_TMP"
-    sudo cp "$SERVICE_TMP" /etc/systemd/system/laurel-api.service
-    rm -f "$SERVICE_TMP"
+    # Write a service file pointing to the git-deployed binary
+    cat > /tmp/laurel-api.service << SVCEOF
+[Unit]
+Description=Laurel clip management API
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${DEPLOY_DIR}/laurel-api
+EnvironmentFile=/etc/laurel-server.conf
+User=${USER}
+ReadWritePaths=${CLIP_DIR}
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+    sudo cp /tmp/laurel-api.service /etc/systemd/system/laurel-api.service
+    rm -f /tmp/laurel-api.service
     sudo systemctl daemon-reload
     sudo systemctl enable --now laurel-api
     sudo systemctl restart laurel-api

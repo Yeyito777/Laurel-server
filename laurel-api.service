@@ -4,11 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/laurel-server/laurel-api
-Environment=CLIP_DIR={{CLIP_DIR}}
-Environment=BIND={{API_BIND}}
-Environment=PORT={{API_PORT}}
-User={{USER}}
+ExecStart=/usr/bin/laurel-api
+EnvironmentFile=/etc/laurel-server.conf
+DynamicUser=yes
+ReadWritePaths=/srv/clips
 Restart=on-failure
 RestartSec=3
 

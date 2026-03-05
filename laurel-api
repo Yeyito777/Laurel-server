@@ -20,8 +20,8 @@ from http.cookies import SimpleCookie
 from urllib.parse import urlparse, parse_qs
 
 CLIP_DIR = os.environ.get("CLIP_DIR", "/srv/clips")
-BIND = os.environ.get("BIND", "127.0.0.1")
-PORT = int(os.environ.get("PORT", "9100"))
+BIND = os.environ.get("API_BIND", os.environ.get("BIND", "127.0.0.1"))
+PORT = int(os.environ.get("API_PORT", os.environ.get("PORT", "9100")))
 
 SLUG_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}$")
 
